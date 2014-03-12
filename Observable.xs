@@ -5,6 +5,15 @@
 
 #include "ppport.h"
 
+/*
+void callperlsub (void * codeRef) {
+    SV* code = (SV*) codeRef;
+    dSP;
+    PUSHMARK(SP);
+    count = perl_call_sv(code, G_DISCARD|G_NOARGS ) ;
+}
+*/
+
 MODULE = Observable		PACKAGE = Observable
 
 SV *
