@@ -126,7 +126,7 @@ unbind(self, event_name, callback)
 
                 AV *events;
                 AV *new_events;
-                I32 event_array_length;
+                I32 event_array_length, i;
 
                 events = (AV*) SvRV( *events_ptr );
                 if ( !(SvTYPE(events) == SVt_PVAV) ) {
@@ -139,7 +139,7 @@ unbind(self, event_name, callback)
                     new_events = newAV();
                 }
 
-                for (int i = 0; i <= event_array_length; i++) {
+                for (i = 0; i <= event_array_length; i++) {
                     SV* event_cb;
 
                     event_cb = (SV*) *av_fetch( events, i, 0 );
