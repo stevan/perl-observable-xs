@@ -86,7 +86,6 @@ bind(self, event_name, callback)
             }
         }
 
-
         av_push( events, SvREFCNT_inc(callback) );
 
         XSRETURN(1);
@@ -201,20 +200,4 @@ has_events(self)
         RETVAL = check;
     OUTPUT:
         RETVAL
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
