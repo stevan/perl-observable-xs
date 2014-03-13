@@ -86,7 +86,8 @@ bind(self, event_name, callback)
             }
         }
 
-        av_push( events, callback );
+
+        av_push( events, SvREFCNT_inc(callback) );
 
         XSRETURN(1);
 
