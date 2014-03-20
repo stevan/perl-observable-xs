@@ -41,3 +41,4 @@ $o->fire('test');
 is($test, 1, '... test event was not fired again');
 
 done_testing;
+

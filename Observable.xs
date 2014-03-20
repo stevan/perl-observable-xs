@@ -5,30 +5,34 @@
 
 #include "ppport.h"
 
+SV* Observable_new(SV* package) {
+    HV *self;
+    HV *stash;
+    SV *self_ref;
+
+    if (!SvPOK(package)) {
+        croak("new() expects a package name");
+    }
+
+    self = newHV();
+
+    stash = gv_stashpv(SvPV_nolen(package), 0);
+    if (!stash) {
+        croak("Failed to find our stash!");
+    }
+
+    self_ref = newRV_noinc((SV*) self);
+
+    return sv_bless(self_ref, stash);
+}
+
 MODULE = Observable		PACKAGE = Observable
 
 SV *
 new(package)
     SV *package
-    PREINIT:
-        HV *self;
-        HV *stash;
-        SV *self_ref;
     CODE:
-        if (!SvPOK(package)) {
-            croak("new() expects a package name");
-        }
-
-        self = newHV();
-
-        stash = gv_stashpv(SvPV_nolen(package), 0);
-        if (!stash) {
-            croak("Failed to find our stash!");
-        }
-
-        self_ref = newRV_noinc((SV*) self);
-
-        RETVAL = sv_bless(self_ref, stash);
+        RETVAL = Observable_new(package);
     OUTPUT:
         RETVAL
 
@@ -68,31 +72,30 @@ fire(self, event_name, ...)
                 if ( !(SvTYPE(events) == SVt_PVAV) ) {
                     croak("events is not an arrayref");
                 }
-            }
 
-            I32 event_array_length, i, j;
+                I32 event_array_length, i, j;
 
-            event_array_length = av_top_index(events);
+                event_array_length = av_len(events);
 
-            if (event_array_length != -1) {
+                if (event_array_length != -1) {
 
-                for (i = 0; i <= event_array_length; i++) {
-                    SV* code;
-                    code = (SV*) *av_fetch( events, i, 0 );
+                    for (i = 0; i <= event_array_length; i++) {
+                        SV* code;
+                        code = (SV*) *av_fetch( events, i, 0 );
 
-                    dSP;
-                    ENTER;
-                    PUSHMARK(SP);
-                    XPUSHs(self);
-                    for (j = 0; j <= items; j++) {
-                        XPUSHs(ST(j));
+                        dSP;
+                        ENTER;
+                        PUSHMARK(SP);
+                        XPUSHs(self);
+                        for (j = 0; j <= items; j++) {
+                            XPUSHs(ST(j));
+                        }
+                        PUTBACK;
+                        (void)call_sv(code, G_VOID|G_DISCARD);
+                        LEAVE;
                     }
-                    PUTBACK;
-                    (void)call_sv(code, G_VOID|G_DISCARD);
-                    LEAVE;
                 }
             }
-
 
         }
 
@@ -217,6 +220,7 @@ unbind(self, event_name, callback)
                         (void)hv_store( callbacks, event_name_string, event_name_string_len, newRV_noinc((SV*) new_events), 0);
                     }
                 }
+
             }
         }
 
