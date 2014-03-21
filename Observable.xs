@@ -31,11 +31,11 @@ HV* get_callbacks (HV* obj) {
     } else {
         return NULL;
     }
-
 }
 
 AV* get_events (HV* callbacks, SV* event_name) {
     AV* events;
+
     HE* events_entry = hv_fetch_ent(callbacks, event_name, 0, 0);
     if (events_entry != NULL) {
         events = (AV*) SvRV(HeVAL(events_entry));
@@ -102,12 +102,14 @@ fire(self, event_name, ...)
 
                 if (event_array_length != -1) {
 
+                    dSP;
+
                     for (i = 0; i <= event_array_length; i++) {
                         SV* code;
                         code = (SV*) *av_fetch(events, i, 0);
 
-                        dSP;
                         ENTER;
+                        SAVETMPS;
                         PUSHMARK(SP);
                         XPUSHs(self);
                         for (j = 0; j <= items; j++) {
@@ -115,6 +117,8 @@ fire(self, event_name, ...)
                         }
                         PUTBACK;
                         (void)call_sv(code, G_VOID|G_DISCARD);
+                        SPAGAIN;
+                        FREETMPS;
                         LEAVE;
                     }
                 }
