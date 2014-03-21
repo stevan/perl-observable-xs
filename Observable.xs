@@ -11,14 +11,10 @@ HV* self_to_obj (SV* self) {
     if (!sv_isobject(self)) {
         croak("Self is not an object");
     }
-
-    obj = (HV*) SvRV(self);
-
-    if (!(SvTYPE(obj) == SVt_PVHV)) {
+    if (!(SvTYPE(SvRV(self)) == SVt_PVHV)) {
         croak("Reference is not a hashref");
     }
-
-    return obj;
+    return (HV*) SvRV(self);
 }
 
 HV* get_callbacks (HV* obj) {
