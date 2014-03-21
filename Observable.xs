@@ -49,24 +49,21 @@ AV* get_events (HV* callbacks, SV* event_name) {
 }
 
 SV* bless_new_hashref(SV* package) {
-    HV* self;
     HV* stash;
-    SV* self_ref;
+    SV* self;
 
     if (!SvPOK(package)) {
         croak("new() expects a package name");
     }
-
-    self = newHV();
 
     stash = gv_stashpv(SvPV_nolen(package), 0);
     if (!stash) {
         croak("Failed to find our stash!");
     }
 
-    self_ref = newRV_noinc((SV*) self);
+    self = newRV_noinc((SV*) newHV());
 
-    return sv_bless(self_ref, stash);
+    return sv_bless(self, stash);
 }
 
 MODULE = Observable		PACKAGE = Observable
