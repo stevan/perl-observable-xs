@@ -5,10 +5,57 @@
 
 #include "ppport.h"
 
-SV* Observable_new(SV* package) {
-    HV *self;
-    HV *stash;
-    SV *self_ref;
+HV* self_to_obj (SV* self) {
+    HV* obj;
+
+    if (!sv_isobject(self)) {
+        croak("Self is not an object");
+    }
+
+    obj = (HV*) SvRV(self);
+
+    if (!(SvTYPE(obj) == SVt_PVHV)) {
+        croak("Reference is not a hashref");
+    }
+
+    return obj;
+}
+
+HV* get_callbacks (HV* obj) {
+    HV*  callbacks;
+    SV** callbacks_ptr;
+
+    callbacks_ptr = hv_fetch(obj, "callbacks", 9, 0);
+    if (callbacks_ptr != NULL) {
+        callbacks = (HV*) SvRV(*callbacks_ptr);
+        if (!(SvTYPE(callbacks) == SVt_PVHV)) {
+            croak("callbacks is not a hashref");
+        }
+        return callbacks;
+    } else {
+        return NULL;
+    }
+
+}
+
+AV* get_events (HV* callbacks, SV* event_name) {
+    AV* events;
+    HE* events_entry = hv_fetch_ent(callbacks, event_name, 0, 0);
+    if (events_entry != NULL) {
+        events = (AV*) SvRV(HeVAL(events_entry));
+        if (!(SvTYPE(events) == SVt_PVAV) ) {
+            croak("events is not an arrayref");
+        }
+        return events;
+    } else {
+        return NULL;
+    }
+}
+
+SV* bless_new_hashref(SV* package) {
+    HV* self;
+    HV* stash;
+    SV* self_ref;
 
     if (!SvPOK(package)) {
         croak("new() expects a package name");
@@ -28,50 +75,30 @@ SV* Observable_new(SV* package) {
 
 MODULE = Observable		PACKAGE = Observable
 
-SV *
+SV*
 new(package)
-    SV *package
+    SV* package
     CODE:
-        RETVAL = Observable_new(package);
+        RETVAL = bless_new_hashref(package);
     OUTPUT:
         RETVAL
 
 void
 fire(self, event_name, ...)
-    SV *self
-    SV *event_name
+    SV* self
+    SV* event_name
     PREINIT:
-        HV *obj;
+        HV* obj;
+        HV* callbacks;
+        AV* events;
     CODE:
-        if ( !sv_isobject(self) ) {
-            croak("Self is not an object");
-        }
+        obj       = self_to_obj(self);
+        callbacks = get_callbacks(obj);
 
-        obj = (HV*) SvRV(self);
+        if (callbacks != NULL) {
 
-        if ( !(SvTYPE(obj) == SVt_PVHV) ) {
-            croak("Reference is not a hashref");
-        }
-
-        HV *callbacks;
-        SV **callbacks_ptr = hv_fetch( obj, "callbacks", 9, 0 );
-
-        if ( callbacks_ptr != NULL ) {
-            callbacks = (HV*) SvRV( *callbacks_ptr );
-            if ( !(SvTYPE(callbacks) == SVt_PVHV) ) {
-                croak("callbacks is not a hashref");
-            }
-
-            STRLEN event_name_string_len;
-            char* event_name_string = SvPV( event_name, event_name_string_len );
-
-            AV *events;
-            SV **events_ptr = hv_fetch( callbacks, event_name_string, event_name_string_len, 0 );
-            if ( events_ptr != NULL ) {
-                events = (AV*) SvRV( *events_ptr );
-                if ( !(SvTYPE(events) == SVt_PVAV) ) {
-                    croak("events is not an arrayref");
-                }
+            events = get_events(callbacks, event_name);
+            if (events != NULL) {
 
                 I32 event_array_length, i, j;
 
@@ -81,7 +108,7 @@ fire(self, event_name, ...)
 
                     for (i = 0; i <= event_array_length; i++) {
                         SV* code;
-                        code = (SV*) *av_fetch( events, i, 0 );
+                        code = (SV*) *av_fetch(events, i, 0);
 
                         dSP;
                         ENTER;
@@ -108,46 +135,25 @@ bind(self, event_name, callback)
     SV *event_name
     SV *callback
     PREINIT:
-        HV *obj;
+        HV* obj;
+        HV* callbacks;
+        AV* events;
     CODE:
-        if ( !sv_isobject(self) ) {
-            croak("Self is not an object");
-        }
+        obj       = self_to_obj(self);
+        callbacks = get_callbacks(obj);
 
-        obj = (HV*) SvRV(self);
-
-        if ( !(SvTYPE(obj) == SVt_PVHV) ) {
-            croak("Reference is not a hashref");
-        }
-
-        HV *callbacks;
-        SV **callbacks_ptr = hv_fetch( obj, "callbacks", 9, 0 );
-        if ( callbacks_ptr == NULL ) {
+        if (callbacks == NULL) {
             callbacks = newHV();
-            (void)hv_store( obj, "callbacks", 9, newRV_noinc((SV*) callbacks), 0);
-        } else {
-            callbacks = (HV*) SvRV( *callbacks_ptr );
-            if ( !(SvTYPE(callbacks) == SVt_PVHV) ) {
-                croak("callbacks is not a hashref");
-            }
+            (void)hv_store(obj, "callbacks", 9, newRV_noinc((SV*) callbacks), 0);
         }
 
-        STRLEN event_name_string_len;
-        char* event_name_string = SvPV( event_name, event_name_string_len );
-
-        AV *events;
-        SV **events_ptr = hv_fetch( callbacks, event_name_string, event_name_string_len, 0 );
-        if ( events_ptr == NULL ) {
+        events = get_events(callbacks, event_name);
+        if (events == NULL) {
             events = newAV();
-            (void)hv_store( callbacks, event_name_string, event_name_string_len, newRV_noinc((SV*) events), 0);
-        } else {
-            events = (AV*) SvRV( *events_ptr );
-            if ( !(SvTYPE(events) == SVt_PVAV) ) {
-                croak("events is not an arrayref");
-            }
+            (void)hv_store_ent(callbacks, event_name, newRV_noinc((SV*) events), 0);
         }
 
-        av_push( events, SvREFCNT_inc(callback) );
+        av_push(events, SvREFCNT_inc(callback));
 
         XSRETURN(1);
 
@@ -157,42 +163,21 @@ unbind(self, event_name, callback)
     SV *event_name
     SV *callback
     PREINIT:
-        HV *obj;
+        HV* obj;
+        HV* callbacks;
+        AV* events;
     CODE:
-        if ( !sv_isobject(self) ) {
-            croak("Self is not an object");
-        }
+        obj       = self_to_obj(self);
+        callbacks = get_callbacks(obj);
 
-        obj = (HV*) SvRV(self);
+        if (callbacks != NULL) {
 
-        if ( !(SvTYPE(obj) == SVt_PVHV) ) {
-            croak("Reference is not a hashref");
-        }
+            events = get_events(callbacks, event_name);
 
-        SV **callbacks_ptr = hv_fetch( obj, "callbacks", 9, 0 );
+            if (events != NULL) {
 
-        if ( callbacks_ptr != NULL ) {
-
-            HV *callbacks = (HV*) SvRV( *callbacks_ptr );
-            if ( !(SvTYPE(callbacks) == SVt_PVHV) ) {
-                croak("callbacks is not a hashref");
-            }
-
-            STRLEN event_name_string_len;
-            char* event_name_string = SvPV( event_name, event_name_string_len );
-
-            SV **events_ptr = hv_fetch( callbacks, event_name_string, event_name_string_len, 0 );
-
-            if ( events_ptr != NULL ) {
-
-                AV *events;
-                AV *new_events;
+                AV* new_events;
                 I32 event_array_length, i;
-
-                events = (AV*) SvRV( *events_ptr );
-                if ( !(SvTYPE(events) == SVt_PVAV) ) {
-                    croak("events is not an arrayref");
-                }
 
                 event_array_length = av_top_index(events);
 
@@ -203,21 +188,20 @@ unbind(self, event_name, callback)
                 for (i = 0; i <= event_array_length; i++) {
                     SV* event_cb;
 
-                    event_cb = (SV*) *av_fetch( events, i, 0 );
-                    if ( SvRV(event_cb) == SvRV(callback) ) {
-                        (void)av_delete( events, i, 0 );
+                    event_cb = (SV*) *av_fetch(events, i, 0);
+                    if (SvRV(event_cb) == SvRV(callback)) {
+                        (void)av_delete(events, i, 0);
                     } else {
-                        av_push( new_events, event_cb );
+                        av_push(new_events, event_cb);
                     }
                 }
 
                 if (event_array_length != -1) {
-                    (void)hv_delete( callbacks, event_name_string, event_name_string_len, 0);
-                    av_undef( events );
-                    if ( av_top_index( new_events ) == -1 ) {
-                        av_undef( new_events );
+                    (void)hv_delete_ent(callbacks, event_name, G_DISCARD, 0);
+                    if (av_top_index(new_events) == -1) {
+                        av_undef(new_events);
                     } else {
-                        (void)hv_store( callbacks, event_name_string, event_name_string_len, newRV_noinc((SV*) new_events), 0);
+                        (void)hv_store_ent(callbacks, event_name, newRV_noinc((SV*) new_events), 0);
                     }
                 }
 
@@ -230,36 +214,12 @@ SV *
 has_events(self)
     SV *self
     PREINIT:
-        HV *obj;
-        SV *check;
+        HV* obj;
+        HV* callbacks;
     CODE:
-        if ( !sv_isobject(self) ) {
-            croak("Self is not an object");
-        }
-
-        obj = (HV*) SvRV(self);
-
-        if ( !(SvTYPE(obj) == SVt_PVHV) ) {
-            croak("Reference is not a hashref");
-        }
-
-        SV **callbacks_ptr = hv_fetch( obj, "callbacks", 9, 0 );
-
-        if ( callbacks_ptr == NULL ) {
-            check = newSViv(0);
-        }
-        else {
-
-            HV *callbacks = (HV*) SvRV( *callbacks_ptr );
-
-            if ( !(SvTYPE(callbacks) == SVt_PVHV) ) {
-                croak("callbacks is not a hashref");
-            }
-
-            check = newSViv( HvKEYS( callbacks ) );
-        }
-
-        RETVAL = check;
+        obj       = self_to_obj(self);
+        callbacks = get_callbacks(obj);
+        RETVAL    = callbacks == NULL ? newSViv(0) : newSViv(HvKEYS(callbacks));
     OUTPUT:
         RETVAL
 
